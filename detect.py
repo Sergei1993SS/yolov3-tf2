@@ -15,23 +15,31 @@ flags.DEFINE_string('weights', './checkpoints/yolov3.tf',
                     'path to weights file')
 flags.DEFINE_boolean('tiny', False, 'yolov3 or yolov3-tiny')
 flags.DEFINE_integer('size', 416, 'resize images to')
-flags.DEFINE_string('image', './data/girl.png', 'path to input image')
+flags.DEFINE_string('image', '/home/sergei/HS_VAL/test.jpg', 'path to input image')
 flags.DEFINE_string('tfrecord', None, 'tfrecord instead of image')
 flags.DEFINE_string('output', './output.jpg', 'path to output image')
-flags.DEFINE_integer('num_classes', 80, 'number of classes in the model')
+flags.DEFINE_integer('num_classes', 1, 'number of classes in the model')
 
-
+cv2.namedWindow('inference', cv2.WINDOW_NORMAL)
 def main(_argv):
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
     for physical_device in physical_devices:
         tf.config.experimental.set_memory_growth(physical_device, True)
 
     if FLAGS.tiny:
-        yolo = YoloV3Tiny(classes=FLAGS.num_classes)
+        yolo = YoloV3Tiny(classes=FLAGS.num_classes, channels=1)
     else:
         yolo = YoloV3(classes=FLAGS.num_classes)
 
-    yolo.load_weights(FLAGS.weights).expect_partial()
+    latest = tf.train.latest_checkpoint('./checkpoints')
+
+    print("=====================================================")
+    print()
+    print(latest)
+    print()
+    print("=====================================================")
+
+    yolo.load_weights('./checkpoints/yolov3_train_63.ckpt').expect_partial() #'./checkpoints/yolov3_train_54.ckpt'
     logging.info('weights loaded')
 
     class_names = [c.strip() for c in open(FLAGS.classes).readlines()]
@@ -44,27 +52,41 @@ def main(_argv):
         img_raw, _label = next(iter(dataset.take(1)))
     else:
         img_raw = tf.image.decode_image(
-            open(FLAGS.image, 'rb').read(), channels=3)
+            open(FLAGS.image, 'rb').read(), channels=1)
 
-    img = tf.expand_dims(img_raw, 0)
-    img = transform_images(img, FLAGS.size)
+    for i in range(100):
+        #############################
+        #dataset = dataset.shuffle(512)
+        img_raw, _label = next(iter(dataset.take(1)))
 
-    t1 = time.time()
-    boxes, scores, classes, nums = yolo(img)
-    t2 = time.time()
-    logging.info('time: {}'.format(t2 - t1))
+        ##################################
+        img = tf.expand_dims(img_raw, 0)
+        img = transform_images(img, FLAGS.size)
 
-    logging.info('detections:')
-    for i in range(nums[0]):
-        logging.info('\t{}, {}, {}'.format(class_names[int(classes[0][i])],
-                                           np.array(scores[0][i]),
-                                           np.array(boxes[0][i])))
+        t1 = time.time()
+        boxes, scores, classes, nums = yolo(img)
+        t2 = time.time()
+        logging.info('time: {}'.format(t2 - t1))
 
-    img = cv2.cvtColor(img_raw.numpy(), cv2.COLOR_RGB2BGR)
-    img = draw_outputs(img, (boxes, scores, classes, nums), class_names)
-    cv2.imwrite(FLAGS.output, img)
-    logging.info('output saved to: {}'.format(FLAGS.output))
+        logging.info('detections:')
+        for i in range(nums[0]):
+            logging.info('\t{}, {}, {}'.format(class_names[int(classes[0][i])],
+                                               np.array(scores[0][i]),
+                                               np.array(boxes[0][i])))
+        img = img_raw.numpy()
+        print(np.max(img))
+        size = img.shape[0]
+        img = np.reshape(img, newshape=(size,size))
+        img = np.array(img, dtype='uint8')
+        print(img.shape)
+        #img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        
 
+         # cv2.imwrite(FLAGS.output, img)
+
+        logging.info('output saved to: {}'.format(FLAGS.output))
+        cv2.imshow('inference', img)
+        cv2.waitKey()
 
 if __name__ == '__main__':
     try:

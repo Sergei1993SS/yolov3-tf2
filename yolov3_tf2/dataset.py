@@ -1,10 +1,33 @@
 import tensorflow as tf
 from absl.flags import FLAGS
+from tf_image.application.augmentation_config import (
+    AugmentationConfig,
+    AspectRatioAugmentation,
+    ColorAugmentation,
+)
+from tf_image.application.tools import random_augmentations
+
+
+
+config = AugmentationConfig()
+
+config.color = ColorAugmentation.NONE
+config.crop = False
+config.distort_aspect_ratio = AspectRatioAugmentation.NONE
+config.quality = False
+config.erasing = False
+config.rotate90 = False
+config.rotate_max = 0
+config.flip_vertical = True
+config.flip_horizontal = True
+config.padding_square = False
+config.rotate45 = False  # rotate 45 degrees clockwise (other multiples can be done by turning on rotate90)
 
 @tf.function
 def transform_targets_for_output(y_true, grid_size, anchor_idxs):
     # y_true: (N, boxes, (x1, y1, x2, y2, class, best_anchor))
     N = tf.shape(y_true)[0]
+
 
     # y_true_out: (N, grid, grid, anchors, [x1, y1, x2, y2, obj, class])
     y_true_out = tf.zeros(
@@ -36,8 +59,10 @@ def transform_targets_for_output(y_true, grid_size, anchor_idxs):
                     idx, [box[0], box[1], box[2], box[3], 1, y_true[i][j][4]])
                 idx += 1
 
-    # tf.print(indexes.stack())
-    # tf.print(updates.stack())
+    #print("+++++++++++++++++++++++++++")
+    #tf.print(indexes.stack())
+    #print("----------------------------")
+    #tf.print(updates.stack())
 
     return tf.tensor_scatter_nd_update(
         y_true_out, indexes.stack(), updates.stack())
@@ -98,20 +123,33 @@ IMAGE_FEATURE_MAP = {
 }
 
 
-def parse_tfrecord(tfrecord, class_table, size):
+def parse_tfrecord(tfrecord, class_table, size): ####!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     x = tf.io.parse_single_example(tfrecord, IMAGE_FEATURE_MAP)
-    x_train = tf.image.decode_jpeg(x['image/encoded'], channels=3)
+    x_train = tf.image.decode_jpeg(x['image/encoded'], channels=1)
     x_train = tf.image.resize(x_train, (size, size))
+    #x_train = tf.image.random_brightness(x_train, max_delta=0.01)
+    noise = tf.random.normal(shape=tf.shape(x_train), mean=0.0, stddev=0.001, dtype=tf.float32)
+    x_train = x_train + noise
+    #x_train = tf.clip_by_value(x_train, 0.0, 1.0)
 
     class_text = tf.sparse.to_dense(
         x['image/object/class/text'], default_value='')
     labels = tf.cast(class_table.lookup(class_text), tf.float32)
+
     y_train = tf.stack([tf.sparse.to_dense(x['image/object/bbox/xmin']),
                         tf.sparse.to_dense(x['image/object/bbox/ymin']),
                         tf.sparse.to_dense(x['image/object/bbox/xmax']),
-                        tf.sparse.to_dense(x['image/object/bbox/ymax']),
-                        labels], axis=1)
+                        tf.sparse.to_dense(x['image/object/bbox/ymax']), labels], axis=1)
 
+
+
+    #x_train, bounding_boxes = random_augmentations(x_train, config, bboxes=bounding_boxes)
+    #xmin, ymin, xmax, ymax = tf.unstack(bounding_boxes, axis=1)
+
+    #tf.print()
+    #x = tf.sort()
+
+    #y_train = tf.stack([xmin, ymin, xmax, ymax, labels], axis=1)
     paddings = [[0, FLAGS.yolo_max_boxes - tf.shape(y_train)[0]], [0, 0]]
     y_train = tf.pad(y_train, paddings)
 
@@ -129,6 +167,7 @@ def load_tfrecord_dataset(file_pattern, class_file, size=416):
 
 
 def load_fake_dataset():
+
     x_train = tf.image.decode_jpeg(
         open('./data/girl.png', 'rb').read(), channels=3)
     x_train = tf.expand_dims(x_train, axis=0)

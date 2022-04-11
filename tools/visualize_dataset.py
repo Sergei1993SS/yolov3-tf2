@@ -11,12 +11,12 @@ from yolov3_tf2.dataset import load_tfrecord_dataset, transform_images
 from yolov3_tf2.utils import draw_outputs
 
 flags.DEFINE_string('classes', './data/coco.names', 'path to classes file')
-flags.DEFINE_integer('size', 416, 'resize images to')
+flags.DEFINE_integer('size', 1024, 'resize images to')
 flags.DEFINE_string(
-    'dataset', './data/voc2012_train.tfrecord', 'path to dataset')
+    'dataset', './data/HS_val.tfrecord', 'path to dataset')
 flags.DEFINE_string('output', './output.jpg', 'path to output image')
 
-
+cv2.namedWindow('VSH', cv2.WINDOW_NORMAL)
 def main(_argv):
     class_names = [c.strip() for c in open(FLAGS.classes).readlines()]
     logging.info('classes loaded')
@@ -24,7 +24,7 @@ def main(_argv):
     dataset = load_tfrecord_dataset(FLAGS.dataset, FLAGS.classes, FLAGS.size)
     dataset = dataset.shuffle(512)
 
-    for image, labels in dataset.take(1):
+    for image, labels in dataset.take(1000):
         boxes = []
         scores = []
         classes = []
@@ -45,11 +45,15 @@ def main(_argv):
             logging.info('\t{}, {}, {}'.format(class_names[int(classes[0][i])],
                                                np.array(scores[0][i]),
                                                np.array(boxes[0][i])))
-
-        img = cv2.cvtColor(image.numpy(), cv2.COLOR_RGB2BGR)
+        print(image)
+        img = image.numpy()#cv2.cvtColor(image.numpy(), cv2.COLOR_RGB2BGR)
+        print(image.shape)
         img = draw_outputs(img, (boxes, scores, classes, nums), class_names)
-        cv2.imwrite(FLAGS.output, img)
-        logging.info('output saved to: {}'.format(FLAGS.output))
+        img = np.array(img, dtype='uint8')
+        cv2.imshow('VSH', img)
+        cv2.waitKey()
+        #cv2.imwrite(FLAGS.output, img)
+        #logging.info('output saved to: {}'.format(FLAGS.output))
 
 
 if __name__ == '__main__':

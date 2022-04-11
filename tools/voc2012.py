@@ -12,7 +12,7 @@ flags.DEFINE_string('data_dir', './data/voc2012_raw/VOCdevkit/VOC2012/',
                     'path to raw PASCAL VOC dataset')
 flags.DEFINE_enum('split', 'train', [
                   'train', 'val'], 'specify train or val spit')
-flags.DEFINE_string('output_file', './data/voc2012_train.tfrecord', 'outpot dataset')
+flags.DEFINE_string('output_file', './data/HS_val.tfrecord', 'outpot dataset')
 flags.DEFINE_string('classes', './data/voc2012.names', 'classes file')
 
 
@@ -25,6 +25,8 @@ def build_example(annotation, class_map):
     width = int(annotation['size']['width'])
     height = int(annotation['size']['height'])
 
+    print(width, height)
+
     xmin = []
     ymin = []
     xmax = []
@@ -36,17 +38,18 @@ def build_example(annotation, class_map):
     difficult_obj = []
     if 'object' in annotation:
         for obj in annotation['object']:
-            difficult = bool(int(obj['difficult']))
-            difficult_obj.append(int(difficult))
+            #print(obj)
+            #difficult = bool(int(obj['difficult']))
+            #difficult_obj.append(int(difficult))
 
-            xmin.append(float(obj['bndbox']['xmin']) / width)
-            ymin.append(float(obj['bndbox']['ymin']) / height)
-            xmax.append(float(obj['bndbox']['xmax']) / width)
-            ymax.append(float(obj['bndbox']['ymax']) / height)
-            classes_text.append(obj['name'].encode('utf8'))
-            classes.append(class_map[obj['name']])
-            truncated.append(int(obj['truncated']))
-            views.append(obj['pose'].encode('utf8'))
+            xmin.append(float(obj['item']['bndbox']['xmin']) / width)
+            ymin.append(float(obj['item']['bndbox']['ymin']) / height)
+            xmax.append(float(obj['item']['bndbox']['xmax']) / width)
+            ymax.append(float(obj['item']['bndbox']['ymax']) / height)
+            classes_text.append(obj['item']['name'].encode('utf8'))
+            classes.append(class_map[obj['item']['name']])
+            truncated.append(int(obj['item']['truncated']))
+
 
     example = tf.train.Example(features=tf.train.Features(feature={
         'image/height': tf.train.Feature(int64_list=tf.train.Int64List(value=[height])),
@@ -64,9 +67,9 @@ def build_example(annotation, class_map):
         'image/object/bbox/ymax': tf.train.Feature(float_list=tf.train.FloatList(value=ymax)),
         'image/object/class/text': tf.train.Feature(bytes_list=tf.train.BytesList(value=classes_text)),
         'image/object/class/label': tf.train.Feature(int64_list=tf.train.Int64List(value=classes)),
-        'image/object/difficult': tf.train.Feature(int64_list=tf.train.Int64List(value=difficult_obj)),
+        #'image/object/difficult': tf.train.Feature(int64_list=tf.train.Int64List(value=difficult_obj)),
         'image/object/truncated': tf.train.Feature(int64_list=tf.train.Int64List(value=truncated)),
-        'image/object/view': tf.train.Feature(bytes_list=tf.train.BytesList(value=views)),
+        #'image/object/view': tf.train.Feature(bytes_list=tf.train.BytesList(value=views)),
     }))
     return example
 
@@ -85,16 +88,18 @@ def parse_xml(xml):
             result[child.tag].append(child_result[child.tag])
     return {xml.tag: result}
 
-
+save_path_annotetions_train = '/home/sergei/HS_VAL/Annotations'
 def main(_argv):
     class_map = {name: idx for idx, name in enumerate(
         open(FLAGS.classes).read().splitlines())}
     logging.info("Class mapping loaded: %s", class_map)
 
     writer = tf.io.TFRecordWriter(FLAGS.output_file)
-    image_list = open(os.path.join(
+    image_list = os.listdir(save_path_annotetions_train)
+    image_list = [os.path.splitext(name)[0] for name in image_list]
+    '''open(os.path.join(
         FLAGS.data_dir, 'ImageSets', 'Main', '%s.txt' % FLAGS.split)).read().splitlines()
-    logging.info("Image list loaded: %d", len(image_list))
+    logging.info("Image list loaded: %d", len(image_list))'''
     for name in tqdm.tqdm(image_list):
         annotation_xml = os.path.join(
             FLAGS.data_dir, 'Annotations', name + '.xml')

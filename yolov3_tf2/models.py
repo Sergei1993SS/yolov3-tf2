@@ -80,7 +80,7 @@ def Darknet(name=None):
 
 
 def DarknetTiny(name=None):
-    x = inputs = Input([None, None, 3])
+    x = inputs = Input([None, None, 1]) #!!!!!!!!!!!!!!!!! chennel
     x = DarknetConv(x, 16, 3)
     x = MaxPool2D(2, 2, 'same')(x)
     x = DarknetConv(x, 32, 3)

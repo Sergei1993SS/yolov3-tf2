@@ -11,6 +11,9 @@ from tensorflow.keras.callbacks import (
     ModelCheckpoint,
     TensorBoard
 )
+
+
+
 from yolov3_tf2.models import (
     YoloV3, YoloV3Tiny, YoloLoss,
     yolo_anchors, yolo_anchor_masks,
@@ -18,6 +21,8 @@ from yolov3_tf2.models import (
 )
 from yolov3_tf2.utils import freeze_all
 import yolov3_tf2.dataset as dataset
+
+
 
 flags.DEFINE_string('dataset', '', 'path to dataset')
 flags.DEFINE_string('val_dataset', '', 'path to validation dataset')
@@ -45,10 +50,14 @@ flags.DEFINE_integer('weights_num_classes', None, 'specify num class for `weight
                      'useful in transfer learning with different number of classes')
 flags.DEFINE_boolean('multi_gpu', False, 'Use if wishing to train with more than 1 GPU.')
 
+print('tf ver {}'.format(tf.__version__))
+
+width = 1224
+height = 1024
 
 def setup_model():
     if FLAGS.tiny:
-        model = YoloV3Tiny(FLAGS.size, training=True,
+        model = YoloV3Tiny(FLAGS.size, channels=1, training=True,
                            classes=FLAGS.num_classes)
         anchors = yolo_tiny_anchors
         anchor_masks = yolo_tiny_anchor_masks
@@ -93,7 +102,7 @@ def setup_model():
             # freeze everything
             freeze_all(model)
 
-    optimizer = tf.keras.optimizers.Adam(lr=FLAGS.learning_rate)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=FLAGS.learning_rate)
     loss = [YoloLoss(anchors[mask], classes=FLAGS.num_classes)
             for mask in anchor_masks]
 
@@ -105,7 +114,7 @@ def setup_model():
 
 def main(_argv):
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
-
+    print('SIZE: {}'.format(FLAGS.size))
     # Setup
     if FLAGS.multi_gpu:
         for physical_device in physical_devices:
@@ -194,10 +203,10 @@ def main(_argv):
     else:
 
         callbacks = [
-            ReduceLROnPlateau(verbose=1),
-            EarlyStopping(patience=3, verbose=1),
-            ModelCheckpoint('checkpoints/yolov3_train_{epoch}.tf',
-                            verbose=1, save_weights_only=True),
+            ReduceLROnPlateau(verbose=1, patience=50),
+            EarlyStopping(patience=100, verbose=1),
+            ModelCheckpoint('checkpoints/yolov3_train_{epoch}.ckpt',
+                            verbose=1, save_weights_only=False, save_best_only=True),
             TensorBoard(log_dir='logs')
         ]
 
@@ -208,6 +217,8 @@ def main(_argv):
                             validation_data=val_dataset)
         end_time = time.time() - start_time
         print(f'Total Training Time: {end_time}')
+
+
 
 
 if __name__ == '__main__':
