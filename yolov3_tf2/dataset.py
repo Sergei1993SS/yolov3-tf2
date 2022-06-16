@@ -5,7 +5,7 @@ from tf_image.application.augmentation_config import (
     AspectRatioAugmentation,
     ColorAugmentation,
 )
-from tf_image.application.tools import random_augmentations
+from tensorflow.python.compiler.tensorrt import trt_convert as trt
 
 
 
